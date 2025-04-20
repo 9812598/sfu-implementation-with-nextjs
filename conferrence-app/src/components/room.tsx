@@ -934,107 +934,125 @@ function MeetRoom(props: any) {
   };
 
   return (
-    <div>
-      <div>
-        <input
-          disabled={isStartMedia}
-          onChange={handleUseVideo}
-          type="checkbox"
-          checked={useVideo}
-        ></input>
-        <label>video</label>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex gap-6 mb-8">
+        <div className="flex items-center gap-2">
+          <input
+            disabled={isStartMedia}
+            onChange={handleUseVideo}
+            type="checkbox"
+            checked={useVideo}
+            className="w-4 h-4 accent-blue-500"
+          />
+          <label className="text-gray-700">Video</label>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            disabled={isStartMedia}
+            onChange={handleUseAudio}
+            type="checkbox"
+            checked={useAudio}
+            className="w-4 h-4 accent-blue-500"
+          />
+          <label className="text-gray-700">Audio</label>
+        </div>
       </div>
-      <div>
-        <input
-          disabled={isStartMedia}
-          onChange={handleUseAudio}
-          type="checkbox"
-          checked={useAudio}
-        ></input>
-        <label>audio</label>
+
+      <div className="flex gap-4 mb-8">
+        {!isStartMedia ? (
+          <button
+            disabled={isStartMedia}
+            onClick={handleStartMedia}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Start Media
+          </button>
+        ) : (
+          <button
+            disabled={!isStartMedia || isConnected}
+            onClick={handleStopMedia}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Stop Media
+          </button>
+        )}
+
+        {!isConnected ? (
+          <button
+            disabled={isConnected || !isStartMedia}
+            onClick={handleConnect}
+            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Connect
+          </button>
+        ) : (
+          <button
+            disabled={!isConnected || !isStartMedia}
+            onClick={handleDisconnect}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Disconnect
+          </button>
+        )}
+
+        {isShareScreen ? (
+          <button
+            disabled={!isStartMedia || !isConnected}
+            onClick={handleDisconnectScreenShare}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Stop Screen Share
+          </button>
+        ) : (
+          <button
+            disabled={!isStartMedia || !isConnected}
+            onClick={handleStartScreenShare}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Share Screen
+          </button>
+        )}
       </div>
 
-      {!isStartMedia ? (
-        <button disabled={isStartMedia} onClick={handleStartMedia}>
-          Start Media
-        </button>
-      ) : (
-        <button
-          disabled={!isStartMedia || isConnected}
-          onClick={handleStopMedia}
-        >
-          Stop Media
-        </button>
-      )}
-      {!isConnected ? (
-        <button disabled={isConnected || !isStartMedia} onClick={handleConnect}>
-          Connect
-        </button>
-      ) : (
-        <button
-          disabled={!isConnected || !isStartMedia}
-          onClick={handleDisconnect}
-        >
-          Disconnect
-        </button>
-      )}
-
-      {isShareScreen ? (
-        <button
-          disabled={!isStartMedia || !isConnected}
-          onClick={handleDisconnectScreenShare}
-        >
-          Stop Screen
-        </button>
-      ) : (
-        <button
-          disabled={!isStartMedia || !isConnected}
-          onClick={handleStartScreenShare}
-        >
-          Start Screen
-        </button>
-      )}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Local Video</h2>
+        <div className="flex gap-4">
+          <video
+            ref={localVideo}
+            autoPlay
+            controls
+            className="w-[320px] h-[240px] rounded-lg shadow-md bg-gray-100"
+          ></video>
+          {/* <video
+            ref={localScreen}
+            controls
+            autoPlay
+            className="w-[320px] h-[240px] rounded-lg shadow-md bg-gray-100"
+          ></video> */}
+        </div>
+      </div>
 
       <div>
-        local video
-        <video
-          ref={localVideo}
-          autoPlay
-          controls
-          style={{
-            width: "240px",
-            height: "180px",
-            border: "1px solid black",
-          }}
-        ></video>
-        <video
-          ref={localScreen}
-          controls
-          autoPlay
-          style={{
-            width: "240px",
-            height: "180px",
-            border: "1px solid black",
-          }}
-        ></video>
-      </div>
-      <div>remote videos</div>
-      {console.log(remoteVideos) ?? null}
-      {Object.keys(remoteVideos).map((key: any, index: number) => {
-        return Object.keys(remoteVideos[key]).map(
-          (key2: any, index2: number) => {
-            const peer: any = remoteVideos[key][key2];
-
-            return (
-              <MemoizedCreateRemoteVideos
-                key={peer.socket_id + "__" + key2}
-                peer={peer}
-                playVideo={playVideo}
-              />
+        <h2 className="text-xl font-semibold mb-4">Remote Videos</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {console.log(remoteVideos) ?? null}
+          {Object.keys(remoteVideos).map((key: any, index: number) => {
+            return Object.keys(remoteVideos[key]).map(
+              (key2: any, index2: number) => {
+                const peer: any = remoteVideos[key][key2];
+                return (
+                  <MemoizedCreateRemoteVideos
+                    key={peer.socket_id + "__" + key2}
+                    peer={peer}
+                    playVideo={playVideo}
+                  />
+                );
+              }
             );
-          }
-        );
-      })}
+          })}
+        </div>
+      </div>
     </div>
   );
 }
