@@ -326,7 +326,10 @@ function MeetRoom(props: any) {
     }
     element.srcObject = stream;
     element.volume = 0;
-    return element.play();
+    return element.play().catch((err: any) => {
+      console.warn("Auto-play failed:", err);
+      // Add a play button or other fallback here if needed
+    });
   }
 
   function pauseVideo(element: any) {
@@ -661,9 +664,12 @@ function MeetRoom(props: any) {
     }
 
     // --- get capabilities --
-    const data = await sendRequest("getRouterRtpCapabilities", {});
-    console.log("getRouterRtpCapabilities:", data);
-    await loadDevice(data);
+    if (!device.current?.loaded) {
+      // --- get capabilities --
+      const data = await sendRequest("getRouterRtpCapabilities", {});
+      console.log("getRouterRtpCapabilities:", data);
+      await loadDevice(data);
+    }
     //  }
 
     // --- prepare transport ---
@@ -714,13 +720,20 @@ function MeetRoom(props: any) {
 
   async function loadDevice(routerRtpCapabilities: any) {
     try {
-      device.current = new Device();
+      if (!device.current) {
+        device.current = new Device();
+      }
+      if (!device.current.loaded) {
+        await device.current.load({ routerRtpCapabilities });
+      }
     } catch (error: any) {
       if (error.name === "UnsupportedError") {
         console.error("browser not supported");
+      } else {
+        console.error("Failed to load device:", error);
       }
+      throw error;
     }
-    await device.current.load({ routerRtpCapabilities });
   }
 
   function sendRequest(type: any, data: any) {
