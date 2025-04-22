@@ -5,7 +5,7 @@ import { io as socketIOClient } from "socket.io-client";
 import { config } from "../lib/app.config";
 
 const MODE_STREAM = "stream";
-const MODE_SHARE_SCREEN = "share_screen";
+// const MODE_SHARE_SCREEN = "share_screen";
 
 const CreateRemoteVideos = (props: any) => {
   const remoteVideo: any = React.useRef(null);
@@ -43,8 +43,8 @@ const CreateRemoteVideos = (props: any) => {
 export const MemoizedCreateRemoteVideos = React.memo(CreateRemoteVideos);
 
 function MeetRoom(props: any) {
-  const localScreen: any = React.useRef(null);
-  const localStreamScreen: any = React.useRef(null);
+  // const localScreen: any = React.useRef(null);
+  // const localStreamScreen: any = React.useRef(null);
 
   const localVideo: any = React.useRef(null);
   const localStream: any = React.useRef(null);
@@ -64,162 +64,162 @@ function MeetRoom(props: any) {
   const [isStartMedia, setIsStartMedia] = React.useState(false);
   const [isConnected, setIsConnected] = React.useState(false);
   const [remoteVideos, setRemoteVideos]: any = React.useState({});
-  const [isShareScreen, setIsShareScreen] = React.useState(false);
+  // const [isShareScreen, setIsShareScreen] = React.useState(false);
 
   // ============ UI button ==========
 
-  const handleStartScreenShare = () => {
-    if (localStreamScreen.current) {
-      console.warn("WARN: local media ALREADY started");
-      return;
-    }
-    if (!localScreen.current) {
-      console.warn("Screen element reference not found");
-      return;
-    }
+  // const handleStartScreenShare = () => {
+  //   if (localStreamScreen.current) {
+  //     console.warn("WARN: local media ALREADY started");
+  //     return;
+  //   }
+  //   if (!localScreen.current) {
+  //     console.warn("Screen element reference not found");
+  //     return;
+  //   }
 
-    const mediaDevices: any = navigator.mediaDevices;
-    mediaDevices
-      .getDisplayMedia({ audio: useAudio, video: useVideo })
-      .then((stream: any) => {
-        localStreamScreen.current = stream;
+  //   const mediaDevices: any = navigator.mediaDevices;
+  //   mediaDevices
+  //     .getDisplayMedia({ audio: useAudio, video: useVideo })
+  //     .then((stream: any) => {
+  //       localStreamScreen.current = stream;
 
-        playVideo(localScreen.current, localStreamScreen.current);
-        handleConnectScreenShare();
-        setIsShareScreen(true);
-        const screenTrack = stream.getTracks()[0];
-        screenTrack.onended = function () {
-          handleDisconnectScreenShare();
-        };
-      })
-      .catch((err: any) => {
-        console.error("media ERROR:", err);
-      });
-  };
+  //       playVideo(localScreen.current, localStreamScreen.current);
+  //       handleConnectScreenShare();
+  //       setIsShareScreen(true);
+  //       const screenTrack = stream.getTracks()[0];
+  //       screenTrack.onended = function () {
+  //         handleDisconnectScreenShare();
+  //       };
+  //     })
+  //     .catch((err: any) => {
+  //       console.error("media ERROR:", err);
+  //     });
+  // };
 
-  async function handleConnectScreenShare() {
-    if (!localStreamScreen.current) {
-      console.warn("WARN: local media NOT READY");
-      return;
-    }
+  // async function handleConnectScreenShare() {
+  //   if (!localStreamScreen.current) {
+  //     console.warn("WARN: local media NOT READY");
+  //     return;
+  //   }
 
-    // // --- connect socket.io ---
-    // await connectSocket().catch((err: any) => {
-    //     console.error(err);
-    //     return;
-    // });
+  //   // // --- connect socket.io ---
+  //   // await connectSocket().catch((err: any) => {
+  //   //     console.error(err);
+  //   //     return;
+  //   // });
 
-    // console.log('connected');
+  //   // console.log('connected');
 
-    // --- get capabilities --
-    const data = await sendRequest("getRouterRtpCapabilities", {});
-    console.log("getRouterRtpCapabilities:", data);
-    await loadDevice(data);
+  //   // --- get capabilities --
+  //   const data = await sendRequest("getRouterRtpCapabilities", {});
+  //   console.log("getRouterRtpCapabilities:", data);
+  //   await loadDevice(data);
 
-    // --- get transport info ---
-    console.log("--- createProducerTransport --");
-    const params = await sendRequest("createProducerTransport", {
-      mode: MODE_SHARE_SCREEN,
-    });
-    console.log("transport params:", params);
-    producerTransport.current = device.current.createSendTransport(params);
-    console.log("createSendTransport:", producerTransport.current);
+  //   // --- get transport info ---
+  //   console.log("--- createProducerTransport --");
+  //   const params = await sendRequest("createProducerTransport", {
+  //     mode: MODE_SHARE_SCREEN,
+  //   });
+  //   console.log("transport params:", params);
+  //   producerTransport.current = device.current.createSendTransport(params);
+  //   console.log("createSendTransport:", producerTransport.current);
 
-    // --- join & start publish --
-    producerTransport.current.on(
-      "connect",
-      async ({ dtlsParameters }: any, callback: any, errback: any) => {
-        console.log("--trasnport connect");
-        sendRequest("connectProducerTransport", {
-          dtlsParameters: dtlsParameters,
-        })
-          .then(callback)
-          .catch(errback);
-      }
-    );
+  //   // --- join & start publish --
+  //   producerTransport.current.on(
+  //     "connect",
+  //     async ({ dtlsParameters }: any, callback: any, errback: any) => {
+  //       console.log("--trasnport connect");
+  //       sendRequest("connectProducerTransport", {
+  //         dtlsParameters: dtlsParameters,
+  //       })
+  //         .then(callback)
+  //         .catch(errback);
+  //     }
+  //   );
 
-    producerTransport.current.on(
-      "produce",
-      async ({ kind, rtpParameters }: any, callback: any, errback: any) => {
-        console.log("--trasnport produce");
-        try {
-          const { id }: any = await sendRequest("produce", {
-            transportId: producerTransport.current.id,
-            kind,
-            rtpParameters,
-            mode: MODE_SHARE_SCREEN,
-          });
-          callback({ id });
-          console.log("--produce requested, then subscribe ---");
-          subscribe();
-        } catch (err) {
-          errback(err);
-        }
-      }
-    );
+  //   producerTransport.current.on(
+  //     "produce",
+  //     async ({ kind, rtpParameters }: any, callback: any, errback: any) => {
+  //       console.log("--trasnport produce");
+  //       try {
+  //         const { id }: any = await sendRequest("produce", {
+  //           transportId: producerTransport.current.id,
+  //           kind,
+  //           rtpParameters,
+  //           mode: MODE_SHARE_SCREEN,
+  //         });
+  //         callback({ id });
+  //         console.log("--produce requested, then subscribe ---");
+  //         subscribe();
+  //       } catch (err) {
+  //         errback(err);
+  //       }
+  //     }
+  //   );
 
-    producerTransport.current.on("connectionstatechange", (state: any) => {
-      switch (state) {
-        case "connecting":
-          console.log("publishing...");
-          break;
+  //   producerTransport.current.on("connectionstatechange", (state: any) => {
+  //     switch (state) {
+  //       case "connecting":
+  //         console.log("publishing...");
+  //         break;
 
-        case "connected":
-          console.log("published");
-          //  setIsConnected(true);
-          break;
+  //       case "connected":
+  //         console.log("published");
+  //         //  setIsConnected(true);
+  //         break;
 
-        case "failed":
-          console.log("failed");
-          producerTransport.current.close();
-          break;
+  //       case "failed":
+  //         console.log("failed");
+  //         producerTransport.current.close();
+  //         break;
 
-        default:
-          break;
-      }
-    });
+  //       default:
+  //         break;
+  //     }
+  //   });
 
-    if (useVideo) {
-      const videoTrack = localStreamScreen.current.getVideoTracks()[0];
-      if (videoTrack) {
-        const trackParams = { track: videoTrack };
-        videoProducer.current[MODE_SHARE_SCREEN] =
-          await producerTransport.current.produce(trackParams);
-      }
-    }
-    if (useAudio) {
-      const audioTrack = localStreamScreen.current.getAudioTracks()[0];
-      if (audioTrack) {
-        const trackParams = { track: audioTrack };
-        audioProducer.current[MODE_SHARE_SCREEN] =
-          await producerTransport.current.produce(trackParams);
-      }
-    }
-  }
+  //   if (useVideo) {
+  //     const videoTrack = localStreamScreen.current.getVideoTracks()[0];
+  //     if (videoTrack) {
+  //       const trackParams = { track: videoTrack };
+  //       videoProducer.current[MODE_SHARE_SCREEN] =
+  //         await producerTransport.current.produce(trackParams);
+  //     }
+  //   }
+  //   if (useAudio) {
+  //     const audioTrack = localStreamScreen.current.getAudioTracks()[0];
+  //     if (audioTrack) {
+  //       const trackParams = { track: audioTrack };
+  //       audioProducer.current[MODE_SHARE_SCREEN] =
+  //         await producerTransport.current.produce(trackParams);
+  //     }
+  //   }
+  // }
 
-  function handleStopScreenShare() {
-    if (localStreamScreen.current) {
-      pauseVideo(localScreen.current);
-      stopLocalStream(localStreamScreen.current);
-      localStreamScreen.current = null;
-      setIsShareScreen(false);
-    }
-  }
-  async function handleDisconnectScreenShare() {
-    handleStopScreenShare();
-    {
-      const producer = videoProducer.current[MODE_SHARE_SCREEN];
-      producer?.close();
-      delete videoProducer.current[MODE_SHARE_SCREEN];
-    }
-    {
-      const producer = audioProducer.current[MODE_SHARE_SCREEN];
-      producer?.close();
-      delete audioProducer.current[MODE_SHARE_SCREEN];
-    }
+  // function handleStopScreenShare() {
+  //   if (localStreamScreen.current) {
+  //     pauseVideo(localScreen.current);
+  //     stopLocalStream(localStreamScreen.current);
+  //     localStreamScreen.current = null;
+  //     setIsShareScreen(false);
+  //   }
+  // }
+  // async function handleDisconnectScreenShare() {
+  //   handleStopScreenShare();
+  //   {
+  //     const producer = videoProducer.current[MODE_SHARE_SCREEN];
+  //     producer?.close();
+  //     delete videoProducer.current[MODE_SHARE_SCREEN];
+  //   }
+  //   {
+  //     const producer = audioProducer.current[MODE_SHARE_SCREEN];
+  //     producer?.close();
+  //     delete audioProducer.current[MODE_SHARE_SCREEN];
+  //   }
 
-    await sendRequest("producerStopShareScreen", {});
-  }
+  //   await sendRequest("producerStopShareScreen", {});
+  // }
 
   const handleUseVideo = (e: any) => {
     setUseVideo(!useVideo);
@@ -257,7 +257,7 @@ function MeetRoom(props: any) {
 
   function handleDisconnect() {
     handleStopMedia();
-    handleStopScreenShare();
+    // handleStopScreenShare();
     // if (videoProducer.current) {
     //     videoProducer.current.close(); // localStream will stop
     //     videoProducer.current = null;
@@ -760,7 +760,7 @@ function MeetRoom(props: any) {
     remoteVideoIds.forEach((rId: any) => {
       consumeAdd(transport, rId, null, "video", MODE_STREAM).then(
         (resp: any) => {
-          consumeAdd(transport, rId, null, "video", MODE_SHARE_SCREEN);
+          consumeAdd(transport, rId, null, "video");
         }
       );
     });
@@ -768,7 +768,7 @@ function MeetRoom(props: any) {
     remotAudioIds.forEach((rId: any) => {
       consumeAdd(transport, rId, null, "audio", MODE_STREAM).then(
         (resp: any) => {
-          consumeAdd(transport, rId, null, "audio", MODE_SHARE_SCREEN);
+          consumeAdd(transport, rId, null, "audio");
         }
       );
     });
@@ -1004,7 +1004,7 @@ function MeetRoom(props: any) {
           </button>
         )}
 
-        {isShareScreen ? (
+        {/* {isShareScreen ? (
           <button
             disabled={!isStartMedia || !isConnected}
             onClick={handleDisconnectScreenShare}
@@ -1020,7 +1020,7 @@ function MeetRoom(props: any) {
           >
             Share Screen
           </button>
-        )}
+        )} */}
       </div>
 
       <div className="mb-8">
