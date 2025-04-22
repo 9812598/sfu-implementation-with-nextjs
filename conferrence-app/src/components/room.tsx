@@ -73,6 +73,10 @@ function MeetRoom(props: any) {
       console.warn("WARN: local media ALREADY started");
       return;
     }
+    if (!localScreen.current) {
+      console.warn("Screen element reference not found");
+      return;
+    }
 
     const mediaDevices: any = navigator.mediaDevices;
     mediaDevices
@@ -312,6 +316,10 @@ function MeetRoom(props: any) {
   }
 
   function playVideo(element: any, stream: any) {
+    if (!element) {
+      console.warn("Element is null, cannot play video");
+      return;
+    }
     if (element.srcObject) {
       console.warn("element ALREADY playing, so ignore");
       return;

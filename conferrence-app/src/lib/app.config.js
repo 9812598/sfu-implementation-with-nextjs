@@ -1,4 +1,4 @@
 export const config = {
-    SERVER_ENDPOINT: 'localhost:5005',
-    APP_ENDPOINT: 'localhost:5001',
+  SERVER_ENDPOINT: "video.closed-gestalt.ru",
+  APP_ENDPOINT: "video.closed-gestalt.ru",
 };

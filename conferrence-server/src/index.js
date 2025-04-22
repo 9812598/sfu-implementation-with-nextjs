@@ -11,7 +11,7 @@ const https = require("https");
 let serverOptions = {
   hostName: "localhost",
   listenPort: 5005,
-  useHttps: true,
+  useHttps: false,
   httpsKeyFile: "./cert/key.pem",
   httpsCertFile: "./cert/cert.pem",
 };
