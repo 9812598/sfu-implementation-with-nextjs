@@ -616,22 +616,34 @@ function MeetRoom(props: any) {
     );
 
     producerTransport.current.on("connectionstatechange", (state: any) => {
+      console.log(`Producer transport state changed to: ${state}`);
       switch (state) {
         case "connecting":
           console.log("publishing...");
+          console.log(
+            "Current transport parameters:",
+            producerTransport.current
+          );
           break;
 
         case "connected":
           console.log("published");
+          console.log(
+            "Transport connected successfully:",
+            producerTransport.current
+          );
           setIsConnected(true);
           break;
 
         case "failed":
-          console.log("failed");
+          console.error("Transport failed");
+          console.error("Last transport state:", producerTransport.current);
+          console.error("Current device state:", device.current);
           producerTransport.current.close();
           break;
 
         default:
+          console.log("Unknown transport state:", state);
           break;
       }
     });
