@@ -65,9 +65,20 @@ const socketMain = require("./socket/index");
 
 const io = socketIo(webServer, {
   cors: {
-    origin: "*",
+    origin: [
+      process.env.CORS_ORIGIN || "http://localhost:3000",
+      "http://localhost:1337",
+      "http://localhost:3012",
+      "http://localhost:5005",
+      "https://video.closed-gestalt.ru",
+      "https://closed-gestalt.ru",
+      "https://api.closed-gestalt.ru", // Your Next.js dev port
+    ],
     methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
   },
+  transports: ["websocket", "polling"],
 });
 
 socketMain(io);
