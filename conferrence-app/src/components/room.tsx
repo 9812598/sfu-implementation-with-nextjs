@@ -505,30 +505,37 @@ function MeetRoom(props: any) {
     mode: any = MODE_STREAM
   ) {
     console.log("--start of consumeAdd -- kind=%s", trackKind);
-    const { rtpCapabilities } = device.current;
-    const data = await sendRequest("consumeAdd", {
-      rtpCapabilities: rtpCapabilities,
-      remoteId: remoteSocketId,
-      kind: trackKind,
-      mode: mode,
-    }).catch((err) => {
-      console.error("consumeAdd ERROR:", err);
-      throw err;
-    });
-    const { producerId, id, kind, rtpParameters }: any = data;
-    if (prdId && prdId !== producerId) {
-      console.warn("producerID NOT MATCH");
+
+    if (!transport) {
+      console.error("Transport not available, attempting to recreate");
+      await subscribe(); // Recreate transport if missing
+      return;
     }
 
-    let consumer = null;
     try {
-      let codecOptions = {};
-      consumer = await transport.consume({
+      const { rtpCapabilities } = device.current;
+      const data = await sendRequest("consumeAdd", {
+        rtpCapabilities: rtpCapabilities,
+        remoteId: remoteSocketId,
+        kind: trackKind,
+        mode: mode,
+      });
+
+      if (!data) {
+        throw new Error("Failed to get consumer data");
+      }
+
+      const { producerId, id, kind, rtpParameters }: any = data;
+      if (prdId && prdId !== producerId) {
+        console.warn("producerID NOT MATCH");
+      }
+
+      let consumer = await transport.consume({
         id,
         producerId,
         kind,
         rtpParameters,
-        codecOptions,
+        codecOptions: {},
         paused: false,
       });
 
@@ -572,6 +579,12 @@ function MeetRoom(props: any) {
       });
     } catch (err) {
       console.error("Consumer creation failed:", err);
+      // Attempt to recover
+      if (err.message?.includes("transport")) {
+        consumerTransport.current?.close();
+        consumerTransport.current = null;
+        await subscribe(); // Retry subscription
+      }
       throw err;
     }
   }
@@ -689,66 +702,88 @@ function MeetRoom(props: any) {
   }
 
   async function subscribe() {
-    // console.log(socketRef.current);
-    if (!socketRef.current) {
-      await connectSocket().catch((err: any) => {
-        console.error(err);
-        return;
-      });
-    }
+    try {
+      // Ensure socket connection
+      if (!socketRef.current) {
+        await connectSocket().catch((err: any) => {
+          console.error("Socket connection failed:", err);
+          throw err;
+        });
+      }
 
-    // --- get capabilities --
-    if (!device.current?.loaded) {
-      // --- get capabilities --
-      const data = await sendRequest("getRouterRtpCapabilities", {});
-      console.log("getRouterRtpCapabilities:", data);
-      await loadDevice(data);
-    }
-    //  }
+      // Ensure device is loaded
+      if (!device.current?.loaded) {
+        const data = await sendRequest("getRouterRtpCapabilities", {});
+        await loadDevice(data);
+      }
 
-    // --- prepare transport ---
-    console.log("--- createConsumerTransport --");
-    if (!consumerTransport.current) {
-      const params = await sendRequest("createConsumerTransport", {});
-      console.log("transport params:", params);
-      consumerTransport.current = device.current.createRecvTransport(params);
-      console.log("createConsumerTransport:", consumerTransport.current);
+      // Create consumer transport if it doesn't exist
+      if (!consumerTransport.current) {
+        console.log("--- createConsumerTransport --");
+        const params = await sendRequest("createConsumerTransport", {});
 
-      // --- join & start publish --
-      consumerTransport.current.on(
-        "connect",
-        async ({ dtlsParameters }: any, callback: any, errback: any) => {
-          console.log("--consumer trasnport connect");
-          sendRequest("connectConsumerTransport", {
-            dtlsParameters: dtlsParameters,
-          })
-            .then(callback)
-            .catch(errback);
+        if (!params) {
+          throw new Error("Failed to get consumer transport parameters");
         }
-      );
 
-      consumerTransport.current.on("connectionstatechange", (state: any) => {
-        switch (state) {
-          case "connecting":
-            console.log("subscribing...");
-            break;
+        consumerTransport.current = device.current.createRecvTransport(params);
 
-          case "connected":
-            console.log("subscribed");
-            //consumeCurrentProducers(clientId);
-            break;
+        // Handle transport connection
+        consumerTransport.current.on(
+          "connect",
+          async ({ dtlsParameters }: any, callback: any, errback: any) => {
+            try {
+              await sendRequest("connectConsumerTransport", {
+                dtlsParameters: dtlsParameters,
+              });
+              callback();
+            } catch (err) {
+              errback(err);
+              console.error("Failed to connect consumer transport:", err);
+            }
+          }
+        );
 
-          case "failed":
-            console.log("failed");
-            producerTransport.current.close();
-            break;
+        // Handle connection state changes
+        consumerTransport.current.on(
+          "connectionstatechange",
+          async (state: any) => {
+            console.log(`Consumer transport state changed to ${state}`);
+            switch (state) {
+              case "failed":
+                console.error("Consumer transport failed");
+                // Attempt to recreate transport
+                consumerTransport.current?.close();
+                consumerTransport.current = null;
+                await subscribe(); // Retry subscription
+                break;
+              case "disconnected":
+                console.log("Consumer transport disconnected");
+                break;
+              case "connected":
+                console.log("Consumer transport connected");
+                break;
+              default:
+                break;
+            }
+          }
+        );
+      }
 
-          default:
-            break;
-        }
-      });
+      // Get remote producer info
+      const remoteInfo = await sendRequest("getProducers", {});
+      console.log("getProducers:", remoteInfo);
 
-      consumeCurrentProducers(clientId.current);
+      // Consume all existing producers
+      await consumeAll(remoteInfo);
+    } catch (err) {
+      console.error("Subscribe failed:", err);
+      // Clean up on failure
+      if (consumerTransport.current) {
+        consumerTransport.current.close();
+        consumerTransport.current = null;
+      }
+      throw err;
     }
   }
 
