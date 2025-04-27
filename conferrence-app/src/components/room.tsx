@@ -9,35 +9,55 @@ const MODE_STREAM = "stream";
 
 const CreateRemoteVideos = (props: any) => {
   const remoteVideo: any = React.useRef(null);
+
   React.useEffect(() => {
-    // if (remoteVideo.current.srcObject) {
-    //     remoteVideo.current.srcObject.addTrack(props.track);
-    //         return;
-    //     }
-    console.log("CreateRemoteVideos");
-    console.log(props);
-    props
-      .playVideo(remoteVideo.current, props.peer.stream)
-      ?.then(() => {
+    if (!remoteVideo.current || !props.peer?.stream) {
+      console.warn("Missing video element or stream");
+      return;
+    }
+
+    const playVideoStream = async () => {
+      try {
+        remoteVideo.current.srcObject = props.peer.stream;
         remoteVideo.current.volume = 1;
-        console.log("remoteVideo.current");
-        console.log(remoteVideo.current);
-      })
-      .catch((err: any) => {
-        console.error("media ERROR:", err);
-      });
-  }, []);
+        await remoteVideo.current.play();
+      } catch (err) {
+        console.error("Failed to play video:", err);
+        // Retry logic for autoplay failures
+        if (err.name === "NotAllowedError") {
+          const playButton = document.createElement("button");
+          playButton.onclick = () => {
+            remoteVideo.current.play();
+            playButton.remove();
+          };
+          playButton.textContent = "Play Video";
+          remoteVideo.current.parentElement?.appendChild(playButton);
+        }
+      }
+    };
+
+    playVideoStream();
+
+    return () => {
+      if (remoteVideo.current?.srcObject) {
+        remoteVideo.current.srcObject = null;
+      }
+    };
+  }, [props.peer?.stream]);
+
   return (
     <video
       ref={remoteVideo}
       controls
+      playsInline
       autoPlay
       style={{
         width: "240px",
         height: "180px",
         border: "1px solid black",
+        backgroundColor: "#000",
       }}
-    ></video>
+    />
   );
 };
 export const MemoizedCreateRemoteVideos = React.memo(CreateRemoteVideos);
@@ -256,63 +276,65 @@ function MeetRoom(props: any) {
   }
 
   function handleDisconnect() {
-    handleStopMedia();
-    // handleStopScreenShare();
-    // if (videoProducer.current) {
-    //     videoProducer.current.close(); // localStream will stop
-    //     videoProducer.current = null;
-    // }
-    {
-      for (const mode in videoProducer.current) {
-        const producer = videoProducer.current[mode];
-        producer?.close();
-        delete videoProducer.current[mode];
-      }
-    }
-    {
-      for (const mode in audioProducer.current) {
-        const producer = audioProducer.current[mode];
-        producer?.close();
-        delete audioProducer.current[mode];
-      }
-    }
-    // if (audioProducer.current) {
-    //     audioProducer.current.close(); // localStream will stop
-    //     audioProducer.current = null;
-    // }
-    if (producerTransport.current) {
-      producerTransport.current.close(); // localStream will stop
-      producerTransport.current = null;
-    }
+    try {
+      handleStopMedia();
 
-    for (const key in videoConsumers.current) {
-      for (const key2 in videoConsumers.current[key]) {
-        const consumer = videoConsumers.current[key][key2];
-        consumer.close();
-        delete videoConsumers.current[key][key2];
-      }
-    }
-    for (const key in audioConsumers.current) {
-      for (const key2 in audioConsumers.current[key]) {
-        const consumer = audioConsumers.current[key][key2];
-        consumer.close();
-        delete audioConsumers.current[key][key2];
-      }
-    }
+      // Clean up producers
+      Object.values(videoProducer.current).forEach((producer) => {
+        if (producer) {
+          producer.close();
+        }
+      });
+      videoProducer.current = {};
 
-    if (consumersStream.current) {
+      Object.values(audioProducer.current).forEach((producer) => {
+        if (producer) {
+          producer.close();
+        }
+      });
+      audioProducer.current = {};
+
+      // Clean up transport
+      if (producerTransport.current) {
+        producerTransport.current.close();
+        producerTransport.current = null;
+      }
+
+      // Clean up consumers
+      Object.keys(videoConsumers.current).forEach((key) => {
+        const consumers = videoConsumers.current[key];
+        Object.values(consumers).forEach((consumer) => {
+          if (consumer) {
+            consumer.close();
+          }
+        });
+      });
+      videoConsumers.current = {};
+
+      Object.keys(audioConsumers.current).forEach((key) => {
+        const consumers = audioConsumers.current[key];
+        Object.values(consumers).forEach((consumer) => {
+          if (consumer) {
+            consumer.close();
+          }
+        });
+      });
+      audioConsumers.current = {};
+
+      // Clean up streams
       consumersStream.current = {};
+
+      if (consumerTransport.current) {
+        consumerTransport.current.close();
+        consumerTransport.current = null;
+      }
+
+      removeAllRemoteVideo();
+      disconnectSocket();
+      setIsConnected(false);
+    } catch (err) {
+      console.error("Disconnect error:", err);
     }
-
-    if (consumerTransport.current) {
-      consumerTransport.current.close();
-      consumerTransport.current = null;
-    }
-
-    removeAllRemoteVideo();
-
-    disconnectSocket();
-    setIsConnected(false);
   }
 
   function playVideo(element: any, stream: any) {
@@ -484,7 +506,6 @@ function MeetRoom(props: any) {
   ) {
     console.log("--start of consumeAdd -- kind=%s", trackKind);
     const { rtpCapabilities } = device.current;
-    //const data = await socket.request('consume', { rtpCapabilities });
     const data = await sendRequest("consumeAdd", {
       rtpCapabilities: rtpCapabilities,
       remoteId: remoteSocketId,
@@ -492,66 +513,67 @@ function MeetRoom(props: any) {
       mode: mode,
     }).catch((err) => {
       console.error("consumeAdd ERROR:", err);
+      throw err;
     });
     const { producerId, id, kind, rtpParameters }: any = data;
     if (prdId && prdId !== producerId) {
       console.warn("producerID NOT MATCH");
     }
 
-    let codecOptions = {};
-    const consumer = await transport.consume({
-      id,
-      producerId,
-      kind,
-      rtpParameters,
-      codecOptions,
-      mode,
-    });
-    //const stream = new MediaStream();
-    //stream.addTrack(consumer.track);
+    let consumer = null;
+    try {
+      let codecOptions = {};
+      consumer = await transport.consume({
+        id,
+        producerId,
+        kind,
+        rtpParameters,
+        codecOptions,
+        paused: false,
+      });
 
-    addConsumer(remoteSocketId, consumer, kind, mode);
-    consumer.remoteId = remoteSocketId;
-    consumer.on("transportclose", () => {
-      console.log("--consumer transport closed. remoteId=" + consumer.remoteId);
-      //consumer.close();
-      //removeConsumer(remoteId);
-      //removeRemoteVideo(consumer.remoteId);
-    });
-    consumer.on("producerclose", () => {
-      console.log("--consumer producer closed. remoteId=" + consumer.remoteId);
-      consumer.close();
-      removeConsumer(consumer.remoteId, kind, mode);
-      removeRemoteVideo(consumer.remoteId, mode);
-    });
-    consumer.on("trackended", () => {
-      console.log("--consumer trackended. remoteId=" + consumer.remoteId);
-      //consumer.close();
-      //removeConsumer(remoteId);
-      //removeRemoteVideo(consumer.remoteId);
-    });
+      addConsumer(remoteSocketId, consumer, kind, mode);
+      consumer.remoteId = remoteSocketId;
 
-    console.log("--end of consumeAdd");
-    //return stream;
+      consumer.on("transportclose", () => {
+        console.log(
+          "--consumer transport closed. remoteId=" + consumer.remoteId
+        );
+        removeConsumer(consumer.remoteId, kind, mode);
+        removeRemoteVideo(consumer.remoteId, mode);
+      });
 
-    if (kind === "video") {
-      console.log("--try resumeAdd --");
-      sendRequest("resumeAdd", {
+      consumer.on("producerclose", () => {
+        console.log(
+          "--consumer producer closed. remoteId=" + consumer.remoteId
+        );
+        consumer.close();
+        removeConsumer(consumer.remoteId, kind, mode);
+        removeRemoteVideo(consumer.remoteId, mode);
+      });
+
+      consumer.on("trackended", () => {
+        console.log("--consumer trackended. remoteId=" + consumer.remoteId);
+        removeConsumer(consumer.remoteId, kind, mode);
+        removeRemoteVideo(consumer.remoteId, mode);
+      });
+
+      console.log("--end of consumeAdd");
+
+      await sendRequest("resumeAdd", {
         remoteId: remoteSocketId,
         kind: kind,
         mode,
-      })
-        .then(() => {
-          console.log("resumeAdd OK");
-        })
-        .catch((err) => {
-          console.error("resumeAdd ERROR:", err);
-        });
+      });
+
+      return new Promise((resolve) => {
+        addRemoteTrack(remoteSocketId, consumer.track, mode);
+        resolve();
+      });
+    } catch (err) {
+      console.error("Consumer creation failed:", err);
+      throw err;
     }
-    return new Promise((resolve: any, reject: any) => {
-      addRemoteTrack(remoteSocketId, consumer.track, mode);
-      resolve();
-    });
   }
 
   async function handleConnect() {
